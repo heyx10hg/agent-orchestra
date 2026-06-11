@@ -1,0 +1,13 @@
+{
+  "name": "@agent-orchestra/adapters",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Agent Orchestra 各平台适配器",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "lint": "eslint src"
+  }
+}

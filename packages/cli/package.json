@@ -1,0 +1,16 @@
+{
+  "name": "@agent-orchestra/cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Agent Orchestra 命令行入口",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "bin": {
+    "agent-orchestra": "src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "lint": "eslint src"
+  }
+}

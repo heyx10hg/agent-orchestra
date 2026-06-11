@@ -1,0 +1,57 @@
+# Agent Orchestra 团队配置示例
+# 本文件展示如何声明式定义多 agent 团队
+
+team: demo-webapp
+
+# Agent 定义
+agents:
+  - name: leader
+    platform: claude-code
+    role: 技术负责人，拆解任务、分派、评审与合并
+    permissions: [plan, review, merge]
+
+  - name: frontend
+    platform: opencode
+    role: 前端工程师，只改 web/ 目录
+    permissions: [code]
+
+  - name: backend
+    platform: codex
+    role: 后端工程师，只改 server/ 目录
+    permissions: [code]
+
+  - name: tester
+    platform: claude-code
+    role: 测试工程师，编写和执行测试用例
+    permissions: [code, test]
+
+# 并发控制
+maxConcurrent: 2
+
+# 任务配置
+task:
+  description: 开发一个简单的待办事项 Web 应用
+  requirements:
+    - 前端使用 React + TypeScript
+    - 后端使用 Node.js + Express
+    - 数据库使用 SQLite
+    - 实现基本的 CRUD 操作
+    - 包含单元测试和集成测试
+
+# 工作区配置
+workspace:
+  baseDir: ./projects/demo-webapp
+  branchPrefix: feature/
+
+# 消息配置
+messaging:
+  storage: sqlite
+  retentionDays: 7
+
+# 黑板配置
+blackboard:
+  enabled: true
+  files:
+    - TASKS.md
+    - DECISIONS.md
+    - CONTRACTS.md
