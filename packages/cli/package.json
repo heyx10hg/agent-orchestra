@@ -2,6 +2,7 @@
   "name": "@agent-orchestra/cli",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "description": "Agent Orchestra 命令行入口",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -9,8 +10,15 @@
     "agent-orchestra": "src/index.ts"
   },
   "scripts": {
-    "build": "tsc",
-    "test": "vitest",
-    "lint": "eslint src"
+    "build": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@agent-orchestra/core": "workspace:*",
+    "@agent-orchestra/adapters": "workspace:*",
+    "yaml": "^2.6.1",
+    "zod": "^3.24.1"
   }
 }

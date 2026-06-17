@@ -2,12 +2,19 @@
   "name": "@agent-orchestra/core",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "description": "Agent Orchestra 核心编排器与消息总线",
   "main": "src/index.ts",
   "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
-    "build": "tsc",
-    "test": "vitest",
+    "build": "tsc -b",
+    "test": "vitest run",
     "lint": "eslint src"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
   }
 }

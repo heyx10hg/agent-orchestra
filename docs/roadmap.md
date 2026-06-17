@@ -27,27 +27,30 @@
 **目标**：实现 Claude Code adapter，让单个 agent 完成一个完整任务
 
 **交付物**：
-- [ ] Claude Code adapter 实现
-  - 登录态检测
-  - 无头模式封装（`claude -p --output-format stream-json`）
-  - 输出解析与标准化
-- [ ] 消息格式定稿
-  - MessageEnvelope 类型定义
+- [x] Claude Code adapter 实现（`packages/adapters`）
+  - 可用性检测（`claude --version`）
+  - 无头模式封装（`claude -p --output-format stream-json --verbose`）
+  - 输出解析与标准化（增量式 NDJSON 解析器）
+  - ProviderProfile 路由（按 agent 注入 `ANTHROPIC_*` 环境变量）
+- [x] 消息格式定稿（`packages/core`）
+  - MessageEnvelope 类型定义（zod schema）
   - 消息验证逻辑
   - 序列化/反序列化
-- [ ] CLI 入口
-  - 基础命令行参数解析
-  - 任务配置加载
-  - 单 agent 任务执行
-- [ ] 测试用例
-  - Adapter 单元测试
+- [x] CLI 入口（`packages/cli`）
+  - 基础命令行参数解析（`node:util` parseArgs）
+  - 任务配置加载（YAML + zod 校验）
+  - 单 agent 任务执行（含 `--dry-run`）
+- [x] 测试用例（vitest，32 项）
+  - Adapter 单元测试（注入伪 spawn，不触发真实 CLI）
   - 消息格式测试
-  - 端到端测试
+  - 端到端测试（`RUN_E2E=1` 门控，默认跳过）
 
 **验收标准**：
-- 能通过 CLI 启动一个 Claude Code agent
-- Agent 能接收任务、执行、返回结果
-- 消息格式符合设计规范
+- [x] 能通过 CLI 启动一个 Claude Code agent
+- [x] Agent 能接收任务、执行、返回结果
+- [x] 消息格式符合设计规范
+
+**状态**：✅ 已完成
 
 ---
 
@@ -56,7 +59,8 @@
 **目标**：实现多 agent 通信闭环
 
 **交付物**：
-- [ ] 第二个 adapter（OpenCode 或 Codex CLI）
+- [x] 第二个 adapter（OpenCode，`opencode run --format json`，已接入 MiMo token plan，真实 e2e 通过且 cost 0）
+- [x] CLI 按 `platform` 选择 adapter（`adapterFor`，跨平台接入点）
 - [ ] Message Bus 实现
   - 消息存储（SQLite 或 JSONL）
   - 消息路由
@@ -157,7 +161,7 @@
 | 里程碑 | 目标 | 预计时间 | 状态 |
 |--------|------|---------|------|
 | M0 | 仓库脚手架与文档 | 第 1 周 | ✅ 已完成 |
-| M1 | 第一个 adapter + 单 agent | 第 2-3 周 | 🔄 进行中 |
+| M1 | 第一个 adapter + 单 agent | 第 2-3 周 | ✅ 已完成 |
 | M2 | 第二个 adapter + 双 agent | 第 4-5 周 | ⏳ 待开始 |
 | M3 | Blackboard 与工作区管理 | 第 6-7 周 | ⏳ 待开始 |
 | M4 | TUI 监控面板 + 配额感知 | 第 8-9 周 | ⏳ 待开始 |
