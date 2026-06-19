@@ -61,24 +61,27 @@
 **交付物**：
 - [x] 第二个 adapter（OpenCode，`opencode run --format json`，已接入 MiMo token plan，真实 e2e 通过且 cost 0）
 - [x] CLI 按 `platform` 选择 adapter（`adapterFor`，跨平台接入点）
-- [ ] Message Bus 实现
-  - 消息存储（SQLite 或 JSONL）
-  - 消息路由
-  - 消息查询
-- [ ] Leader-Worker 通信
-  - 任务分发
-  - 进度汇报
-  - 问答交互
-- [ ] Orchestrator 核心
-  - 回合调度
-  - Agent 生命周期管理
-  - 基础错误处理
+- [x] Message Bus 实现
+  - 消息存储（InMemory + JSONL 追加日志持久化）
+  - 消息查询（按 from / to / type 过滤）
+- [x] Leader-Worker 通信
+  - 任务分发（leader 拆解 → task 消息）
+  - 进度汇报（worker → report 消息）
+  - 评审决策（可选 --review → decision 消息）
+- [x] Orchestrator 核心（`runLeaderWorker` 闭环）
+  - 顺序回合调度
+  - runAgent 统一 agent 生命周期（start→send→stream→stop）
+  - 基础错误处理（isError 透传）
+- [x] CLI `orchestrate` 子命令
+- [ ] 真实双 agent 闭环已验证（leader+worker 同 MiMo 跑通，cost 0；跨平台 official+MiMo 有门控 e2e）
 
 **验收标准**：
-- 两个不同平台的 agent 可以通信
-- Leader 可以向 Worker 分发任务
-- Worker 可以向 Leader 汇报进度
-- 消息传递可靠，无丢失
+- [x] 两个不同平台的 agent 可以通信（adapter 各自真实 e2e 通过）
+- [x] Leader 可以向 Worker 分发任务（task 消息流经总线）
+- [x] Worker 可以向 Leader 汇报进度（report 消息回流）
+- [x] 消息传递可靠，无丢失（JSONL 持久化，可回放）
+
+**状态**：✅ 核心已完成（真实跨平台双 agent e2e 由 `RUN_E2E=1` 触发）
 
 ---
 

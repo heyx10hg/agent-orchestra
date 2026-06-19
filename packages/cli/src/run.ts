@@ -1,5 +1,5 @@
 import { ClaudeCodeAdapter, OpenCodeAdapter } from '@agent-orchestra/adapters';
-import type { AgentAdapter, AgentConfig } from '@agent-orchestra/core';
+import { runAgent, type AgentAdapter, type AgentConfig, type AgentOutput } from '@agent-orchestra/core';
 import { loadTeamConfig, selectAgent, type TeamConfig } from './config.js';
 
 /** 按平台标识选择 adapter，这是跨平台多 agent 协同的接入点 */
@@ -63,31 +63,13 @@ export async function runTask(options: RunOptions): Promise<number> {
   }
 
   const adapter = options.adapter ?? adapterFor(agent.platform);
-  const session = await adapter.start(agent);
-  await adapter.send(session, prompt);
+  const result = await runAgent(adapter, agent, prompt, (out) => printOutput(out, log));
+  if (result.resultText) log(`\n[结果] ${result.resultText}`);
+  return result.isError ? 1 : 0;
+}
 
-  let exitCode = 0;
-  try {
-    for await (const out of adapter.stream(session)) {
-      switch (out.kind) {
-        case 'assistant':
-          if (out.text) log(out.text);
-          break;
-        case 'result':
-          log(`\n[结果] ${out.text}`);
-          if (out.isError) exitCode = 1;
-          break;
-        case 'error':
-          log(`\n[错误] ${out.message}`);
-          exitCode = 1;
-          break;
-        case 'system':
-          // 系统事件默认不打印，避免噪声
-          break;
-      }
-    }
-  } finally {
-    await adapter.stop(session);
-  }
-  return exitCode;
+/** 把单条归一化输出友好打印到日志 */
+function printOutput(out: AgentOutput, log: (line: string) => void): void {
+  if (out.kind === 'assistant' && out.text) log(out.text);
+  else if (out.kind === 'error') log(`\n[错误] ${out.message}`);
 }

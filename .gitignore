@@ -34,3 +34,6 @@ coverage/
 # Temporary
 tmp/
 temp/
+
+# Runtime: orchestrator 消息总线输出
+.agent-orchestra/
