@@ -129,4 +129,23 @@ describe('ClaudeCodeAdapter 端到端（注入伪 spawn）', () => {
     await adapter.stop(session);
     expect(kill).toHaveBeenCalled();
   });
+
+  it('第二轮 send 用 --resume 续接首轮捕获的 session id', async () => {
+    const lines = [
+      JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sess-123' }) + '\n',
+      JSON.stringify({ type: 'result', subtype: 'success', result: 'ok', is_error: false }) + '\n',
+    ];
+    const { spawnFn, calls } = makeFakeSpawn(lines);
+    const adapter = new ClaudeCodeAdapter({ spawnFn });
+    const session = await adapter.start(baseConfig);
+
+    await adapter.send(session, '第一轮');
+    await collect(adapter.stream(session)); // 消费完才会捕获 session id
+
+    await adapter.send(session, '第二轮');
+    await collect(adapter.stream(session));
+
+    expect(calls[0].args).not.toContain('--resume');
+    expect(calls[1].args).toEqual(expect.arrayContaining(['--resume', 'sess-123']));
+  });
 });

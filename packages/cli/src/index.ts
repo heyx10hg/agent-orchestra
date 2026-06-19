@@ -24,6 +24,8 @@ orchestrate 选项：
   --leader       leader agent 名称（缺省：有 plan/review/merge 权限者）
   --worker       worker agent 名称（缺省：第一个非 leader）
   --review       worker 汇报后让 leader 评审并产出 decision
+  --max-rounds   worker↔leader 问答最大轮数（封顶 token，缺省 3）
+  --cwd          覆盖 agent 工作目录（纯对话用空目录可省 token）
 `;
 
 async function main(argv: string[]): Promise<number> {
@@ -69,6 +71,8 @@ async function main(argv: string[]): Promise<number> {
         leader: { type: 'string' },
         worker: { type: 'string' },
         review: { type: 'boolean', default: false },
+        'max-rounds': { type: 'string' },
+        cwd: { type: 'string' },
         help: { type: 'boolean', short: 'h', default: false },
       },
     });
@@ -87,6 +91,8 @@ async function main(argv: string[]): Promise<number> {
       leaderName: values.leader,
       workerName: values.worker,
       review: values.review,
+      maxRounds: values['max-rounds'] ? Number(values['max-rounds']) : undefined,
+      cwd: values.cwd,
     });
   }
 

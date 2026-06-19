@@ -89,4 +89,40 @@ describe('OpenCodeAdapter 端到端（注入伪 spawn）', () => {
     await adapter.stop(session);
     expect(kill).toHaveBeenCalled();
   });
+
+  it('result 事件透出 token usage', async () => {
+    const lines = [
+      JSON.stringify({ type: 'text', part: { type: 'text', text: 'OK' } }) + '\n',
+      JSON.stringify({
+        type: 'step_finish',
+        part: { type: 'step-finish', reason: 'stop', tokens: { input: 8528, output: 4, total: 9584 } },
+        sessionID: 'ses_abc',
+      }) + '\n',
+    ];
+    const { spawnFn } = makeFakeSpawn(lines);
+    const adapter = new OpenCodeAdapter({ spawnFn });
+    const session = await adapter.start(baseConfig);
+    await adapter.send(session, 'x');
+    const out = await collect(adapter.stream(session));
+    const result = out.find((o) => o.kind === 'result') as any;
+    expect(result.usage).toMatchObject({ input: 8528, output: 4, total: 9584 });
+  });
+
+  it('第二轮 send 用 -s 续接首轮捕获的 sessionID', async () => {
+    const lines = [
+      JSON.stringify({ type: 'text', part: { type: 'text', text: 'OK' } }) + '\n',
+      JSON.stringify({ type: 'step_finish', part: { type: 'step-finish', reason: 'stop' }, sessionID: 'ses_xyz' }) + '\n',
+    ];
+    const { spawnFn, calls } = makeFakeSpawn(lines);
+    const adapter = new OpenCodeAdapter({ spawnFn });
+    const session = await adapter.start(baseConfig);
+
+    await adapter.send(session, '第一轮');
+    await collect(adapter.stream(session));
+    await adapter.send(session, '第二轮');
+    await collect(adapter.stream(session));
+
+    expect(calls[0].args).not.toContain('-s');
+    expect(calls[1].args).toEqual(expect.arrayContaining(['-s', 'ses_xyz']));
+  });
 });

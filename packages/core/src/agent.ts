@@ -42,11 +42,18 @@ export interface AgentSession {
   config: AgentConfig;
 }
 
+/** token 用量（各平台字段不同，由 adapter 归一化） */
+export interface TokenUsage {
+  input?: number;
+  output?: number;
+  total?: number;
+}
+
 /** adapter 归一化后的输出事件 */
 export type AgentOutput =
-  | { kind: 'system'; subtype: string; raw: unknown }
+  | { kind: 'system'; subtype: string; sessionId?: string; raw: unknown }
   | { kind: 'assistant'; text: string; raw: unknown }
-  | { kind: 'result'; text: string; isError: boolean; raw: unknown }
+  | { kind: 'result'; text: string; isError: boolean; usage?: TokenUsage; sessionId?: string; raw: unknown }
   | { kind: 'error'; message: string; raw: unknown };
 
 /**

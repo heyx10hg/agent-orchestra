@@ -1,4 +1,14 @@
-import type { AgentOutput } from '@agent-orchestra/core';
+import type { AgentOutput, TokenUsage } from '@agent-orchestra/core';
+
+/** 从 claude result 的 usage 字段提取 token 用量 */
+function extractUsage(usage: any): TokenUsage | undefined {
+  if (!usage || typeof usage !== 'object') return undefined;
+  const input = usage.input_tokens;
+  const output = usage.output_tokens;
+  if (input == null && output == null) return undefined;
+  const total = (input ?? 0) + (output ?? 0);
+  return { input, output, total: total || undefined };
+}
 
 /**
  * 增量式 NDJSON 解析器：把 `claude --output-format stream-json` 的字节流
@@ -65,10 +75,17 @@ export function normalizeEvent(event: any): AgentOutput {
         kind: 'result',
         text: typeof event.result === 'string' ? event.result : '',
         isError: event.is_error === true || event.subtype === 'error',
+        usage: extractUsage(event.usage),
+        sessionId: typeof event.session_id === 'string' ? event.session_id : undefined,
         raw: event,
       };
     case 'system':
-      return { kind: 'system', subtype: String(event.subtype ?? 'unknown'), raw: event };
+      return {
+        kind: 'system',
+        subtype: String(event.subtype ?? 'unknown'),
+        sessionId: typeof event.session_id === 'string' ? event.session_id : undefined,
+        raw: event,
+      };
     default:
       return { kind: 'system', subtype: String(event?.type ?? 'unknown'), raw: event };
   }

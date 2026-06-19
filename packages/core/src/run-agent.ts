@@ -1,4 +1,4 @@
-import type { AgentAdapter, AgentConfig, AgentOutput } from './agent.js';
+import type { AgentAdapter, AgentConfig, AgentOutput, AgentSession, TokenUsage } from './agent.js';
 
 export interface RunAgentResult {
   /** 拼接的全部 assistant 文本块 */
@@ -11,13 +11,67 @@ export interface RunAgentResult {
   isError: boolean;
   /** 错误信息（若出现 error 事件） */
   errorMessage?: string;
+  /** 本轮 token 用量（累加各 result 事件） */
+  usage: TokenUsage;
+  /** 平台会话 id（用于多轮续接） */
+  sessionId?: string;
+}
+
+function addUsage(acc: TokenUsage, u?: TokenUsage): void {
+  if (!u) return;
+  if (u.input != null) acc.input = (acc.input ?? 0) + u.input;
+  if (u.output != null) acc.output = (acc.output ?? 0) + u.output;
+  if (u.total != null) acc.total = (acc.total ?? 0) + u.total;
 }
 
 /**
- * 驱动一个 adapter 跑完一次任务并收敛输出：start → send → stream → stop。
- *
- * 统一 CLI 与 Orchestrator 的「让 agent 跑一轮并拿到最终文本」逻辑，
- * 通过 onOutput 回调把流式事件透出给调用方（用于实时打印）。
+ * 在一个已存在的会话上跑完一轮：send → stream → 收敛。不负责 start/stop，
+ * 因此可在同一会话上多次调用（配合 adapter 的会话续接实现低成本多轮）。
+ */
+export async function collectRun(
+  adapter: AgentAdapter,
+  session: AgentSession,
+  prompt: string,
+  onOutput?: (output: AgentOutput) => void,
+): Promise<RunAgentResult> {
+  await adapter.send(session, prompt);
+
+  let assistantText = '';
+  let resultText = '';
+  let errorMessage = '';
+  let isError = false;
+  let sessionId: string | undefined;
+  const usage: TokenUsage = {};
+
+  for await (const out of adapter.stream(session)) {
+    onOutput?.(out);
+    switch (out.kind) {
+      case 'assistant':
+        assistantText += out.text;
+        break;
+      case 'result':
+        resultText = out.text;
+        if (out.isError) isError = true;
+        addUsage(usage, out.usage);
+        if (out.sessionId) sessionId = out.sessionId;
+        break;
+      case 'system':
+        if (out.sessionId) sessionId = out.sessionId;
+        break;
+      case 'error':
+        isError = true;
+        errorMessage = out.message;
+        break;
+    }
+  }
+
+  const answer = resultText || assistantText || errorMessage;
+  return { assistantText, resultText, answer, isError, errorMessage: errorMessage || undefined, usage, sessionId };
+}
+
+/**
+ * 驱动一个 adapter 跑完一次性任务：start → send → stream → stop。
+ * 单轮场景使用；多轮请用 start + 多次 collectRun + stop。
  */
 export async function runAgent(
   adapter: AgentAdapter,
@@ -26,33 +80,9 @@ export async function runAgent(
   onOutput?: (output: AgentOutput) => void,
 ): Promise<RunAgentResult> {
   const session = await adapter.start(config);
-  await adapter.send(session, prompt);
-
-  let assistantText = '';
-  let resultText = '';
-  let errorMessage = '';
-  let isError = false;
   try {
-    for await (const out of adapter.stream(session)) {
-      onOutput?.(out);
-      switch (out.kind) {
-        case 'assistant':
-          assistantText += out.text;
-          break;
-        case 'result':
-          resultText = out.text;
-          if (out.isError) isError = true;
-          break;
-        case 'error':
-          isError = true;
-          errorMessage = out.message;
-          break;
-      }
-    }
+    return await collectRun(adapter, session, prompt, onOutput);
   } finally {
     await adapter.stop(session);
   }
-
-  const answer = resultText || assistantText || errorMessage;
-  return { assistantText, resultText, answer, isError, errorMessage: errorMessage || undefined };
 }

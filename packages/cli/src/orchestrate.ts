@@ -28,10 +28,13 @@ export interface OrchestrateOptions {
   workerName?: string;
   busPath?: string;
   review?: boolean;
+  maxRounds?: number;
+  /** 覆盖 agent 工作目录（纯对话场景指向空目录省 token） */
+  cwd?: string;
   log?: (line: string) => void;
 }
 
-/** 执行 leader→worker 协同：加载配置 → 选角色 → 经总线驱动 Orchestrator → 打印消息流。 */
+/** 执行 leader→worker 协同：加载配置 → 选角色 → 经总线驱动 Orchestrator → 打印消息流与 token 计量。 */
 export async function orchestrateTask(options: OrchestrateOptions): Promise<number> {
   const log = options.log ?? ((l: string) => console.log(l));
   const config = loadTeamConfig(options.configPath);
@@ -46,8 +49,10 @@ export async function orchestrateTask(options: OrchestrateOptions): Promise<numb
     bus,
     resolveAdapter: (c) => adapterFor(c.platform),
     review: options.review,
+    cwd: options.cwd,
     onOutput: (agent: AgentConfig, out: AgentOutput) => {
       if (out.kind === 'assistant' && out.text) log(`[${agent.name}] ${out.text}`);
+      else if (out.kind === 'result' && out.usage?.total != null) log(`[${agent.name}] (本轮 ${out.usage.total} tokens)`);
       else if (out.kind === 'error') log(`[${agent.name}][错误] ${out.message}`);
     },
   });
@@ -55,10 +60,16 @@ export async function orchestrateTask(options: OrchestrateOptions): Promise<numb
   log(`leader = ${leader.name} (${leader.platform})   worker = ${worker.name} (${worker.platform})`);
   log(`任务：${config.task.description}\n`);
 
-  const messages = await orch.runLeaderWorker({ leader, worker, task: config.task.description });
+  const { messages, usage, rounds } = await orch.runLeaderWorker({
+    leader,
+    worker,
+    task: config.task.description,
+    maxRounds: options.maxRounds,
+  });
 
-  log(`\n=== 消息流（共 ${messages.length} 条，已持久化到 ${busPath}）===`);
+  log(`\n=== 消息流（共 ${messages.length} 条，${rounds} 轮，已持久化到 ${busPath}）===`);
   for (const m of messages) log(formatMessage(m));
+  log(`\n=== token 累计：input=${usage.input ?? '-'} output=${usage.output ?? '-'} total=${usage.total ?? '-'} ===`);
 
   return messages.some((m) => m.type === 'report') ? 0 : 1;
 }

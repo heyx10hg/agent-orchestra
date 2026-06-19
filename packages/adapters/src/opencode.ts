@@ -1,7 +1,7 @@
 import { spawn as nodeSpawn } from 'node:child_process';
 import type { AgentAdapter, AgentConfig, AgentOutput, AgentSession } from '@agent-orchestra/core';
 import { OpenCodeJsonParser } from './opencode-json.js';
-import { pipeChildToQueue } from './streaming.js';
+import { pipeChildToQueue, captureSessionId } from './streaming.js';
 import type { SpawnFn } from './claude-code.js';
 
 export interface OpenCodeAdapterOptions {
@@ -14,6 +14,8 @@ export interface OpenCodeAdapterOptions {
 interface SessionState {
   child: any;
   stream: AsyncIterable<AgentOutput>;
+  /** 平台会话 id，用于后续轮次 -s 续接 */
+  platformSessionId?: string;
 }
 
 /**
@@ -33,9 +35,10 @@ export class OpenCodeAdapter implements AgentAdapter {
     this.binPath = options.binPath ?? 'opencode';
   }
 
-  /** 拼装传给 opencode 的命令行参数 */
-  buildArgv(prompt: string, config: AgentConfig): string[] {
+  /** 拼装传给 opencode 的命令行参数；传入 resumeId 时用 -s 续接会话（多轮省 token） */
+  buildArgv(prompt: string, config: AgentConfig, resumeId?: string): string[] {
     const argv = ['run', prompt, '--format', 'json'];
+    if (resumeId) argv.push('-s', resumeId);
     if (config.model) argv.push('-m', config.model);
     return argv;
   }
@@ -45,13 +48,17 @@ export class OpenCodeAdapter implements AgentAdapter {
   }
 
   async send(session: AgentSession, message: string): Promise<void> {
-    const argv = this.buildArgv(message, session.config);
+    const prev = this.sessions.get(session.id);
+    const argv = this.buildArgv(message, session.config, prev?.platformSessionId);
     const child = this.spawnFn(this.binPath, argv, {
       cwd: session.config.cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    const stream = pipeChildToQueue(child, new OpenCodeJsonParser());
-    this.sessions.set(session.id, { child, stream });
+    const state: SessionState = { child, stream: undefined as never, platformSessionId: prev?.platformSessionId };
+    state.stream = captureSessionId(pipeChildToQueue(child, new OpenCodeJsonParser()), (id) => {
+      state.platformSessionId = id;
+    });
+    this.sessions.set(session.id, state);
   }
 
   stream(session: AgentSession): AsyncIterable<AgentOutput> {

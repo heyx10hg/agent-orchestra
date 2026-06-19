@@ -38,6 +38,22 @@ export function pipeChildToQueue(child: any, parser: LineParser): AsyncIterable<
   return queue;
 }
 
+/**
+ * 包装输出流，嗅探其中的平台会话 id（result/system 事件的 sessionId）并回调，
+ * 供 adapter 记录以实现多轮续接。
+ */
+export async function* captureSessionId(
+  stream: AsyncIterable<AgentOutput>,
+  onSessionId: (id: string) => void,
+): AsyncIterable<AgentOutput> {
+  for await (const out of stream) {
+    if ((out.kind === 'result' || out.kind === 'system') && out.sessionId) {
+      onSessionId(out.sessionId);
+    }
+    yield out;
+  }
+}
+
 /** 单生产者/单消费者异步队列，把事件回调桥接成 AsyncIterable */
 export class AsyncQueue<T> implements AsyncIterable<T> {
   private items: T[] = [];

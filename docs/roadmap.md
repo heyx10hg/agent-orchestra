@@ -72,8 +72,13 @@
   - 顺序回合调度
   - runAgent 统一 agent 生命周期（start→send→stream→stop）
   - 基础错误处理（isError 透传）
-- [x] CLI `orchestrate` 子命令
-- [ ] 真实双 agent 闭环已验证（leader+worker 同 MiMo 跑通，cost 0；跨平台 official+MiMo 有门控 e2e）
+- [x] CLI `orchestrate` 子命令（--max-rounds / --cwd / --review）
+- [x] 多轮问答闭环（worker 反问 → leader 回答 → 续接，轮次上限封顶）
+- [x] 会话续接（claude `--resume` / opencode `-s`）降低多轮 token
+- [x] token 计量（从输出解析 usage，逐轮 + 累计可见）
+- [x] 真实双 agent 闭环已验证（leader+worker 同 MiMo 跑通，cost 0；跨平台 official+MiMo 有门控 e2e）
+
+**实测**：单轮每个 agent ~9.8K token（OpenCode 固定开销为主），优化重点在会话续接复用缓存。
 
 **验收标准**：
 - [x] 两个不同平台的 agent 可以通信（adapter 各自真实 e2e 通过）

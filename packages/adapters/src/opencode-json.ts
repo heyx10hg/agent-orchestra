@@ -58,14 +58,31 @@ export class OpenCodeJsonParser implements LineParser {
         const reason = event.part?.reason;
         const text = this.accumulatedText;
         this.accumulatedText = '';
-        return { kind: 'result', text, isError: reason === 'error', raw: event };
+        const t = event.part?.tokens;
+        const usage =
+          t && typeof t === 'object'
+            ? { input: t.input, output: t.output, total: t.total }
+            : undefined;
+        return {
+          kind: 'result',
+          text,
+          isError: reason === 'error',
+          usage,
+          sessionId: typeof event.sessionID === 'string' ? event.sessionID : undefined,
+          raw: event,
+        };
       }
       case 'error': {
         const message = event.error?.message ?? event.message ?? 'OpenCode 报错';
         return { kind: 'error', message: String(message), raw: event };
       }
       default:
-        return { kind: 'system', subtype: String(event?.type ?? 'unknown'), raw: event };
+        return {
+          kind: 'system',
+          subtype: String(event?.type ?? 'unknown'),
+          sessionId: typeof event.sessionID === 'string' ? event.sessionID : undefined,
+          raw: event,
+        };
     }
   }
 }
