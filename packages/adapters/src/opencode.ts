@@ -38,6 +38,9 @@ export class OpenCodeAdapter implements AgentAdapter {
   /** 拼装传给 opencode 的命令行参数；传入 resumeId 时用 -s 续接会话（多轮省 token） */
   buildArgv(prompt: string, config: AgentConfig, resumeId?: string): string[] {
     const argv = ['run', prompt, '--format', 'json'];
+    // 显式 --dir：spawn 的 cwd 不会更新 PWD，而 opencode 按 PWD 解析项目根，
+    // 不指定会让它跑在父进程目录（曾导致 worker 在错误目录"写"文件）。
+    if (config.cwd) argv.push('--dir', config.cwd);
     if (resumeId) argv.push('-s', resumeId);
     if (config.model) argv.push('-m', config.model);
     return argv;
@@ -52,6 +55,8 @@ export class OpenCodeAdapter implements AgentAdapter {
     const argv = this.buildArgv(message, session.config, prev?.platformSessionId);
     const child = this.spawnFn(this.binPath, argv, {
       cwd: session.config.cwd,
+      // 同步 PWD：spawn 的 cwd 不会更新 PWD，而部分工具按 PWD 解析项目目录
+      env: session.config.cwd ? { ...process.env, PWD: session.config.cwd } : process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     const state: SessionState = { child, stream: undefined as never, platformSessionId: prev?.platformSessionId };

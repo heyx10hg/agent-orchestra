@@ -95,24 +95,18 @@
 **目标**：实现共享上下文和工作区隔离
 
 **交付物**：
-- [ ] Blackboard 实现
-  - TASKS.md 管理
-  - DECISIONS.md 管理
-  - CONTRACTS.md 管理
-  - 并发控制
-- [ ] Workspace Manager
-  - Git worktree 创建/删除
-  - 分支管理
-  - 代码审查流程
-  - 合并策略
-- [ ] 集成测试
-  - 多 agent 并行工作
-  - 冲突检测与解决
-  - 黑板一致性验证
+- [x] Blackboard 实现（TASKS.md / DECISIONS.md / CONTRACTS.md 追加与读取）
+- [x] Workspace Manager（git worktree 创建/提交/合并/清理、`agent/<name>` 分支）
+- [x] Orchestrator.runCodingTask：worker 在 worktree 写码 → leader 审查 diff → 通过则合并
+- [x] CLI coding 模式（orchestrate --repo / --merge）
+- [x] 真实跑验证（MiMo-only，cost 0）：worker 写真实代码、leader 审查、自动合并回主分支
+- [ ] CONTRACTS.md 并发控制、多 worker 并行（后续）
+
+**踩坑修复**：spawn 的 cwd 不更新 PWD，opencode 按 PWD 解析项目目录，导致 worker 跑在错误目录"假装"写文件——已通过 `--dir` + 同步 PWD 修正（真实跑才暴露）。
 
 **验收标准**：
-- 多个 agent 可以同时在独立分支工作
-- Blackboard 内容在所有 agent 间同步
+- [x] worker 可以在独立 worktree 分支工作，leader 审查后合并
+- [x] Blackboard 记录任务与决策
 - Leader 可以审查并合并 Worker 的代码
 - 无并发冲突
 

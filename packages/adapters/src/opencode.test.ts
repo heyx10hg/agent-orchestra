@@ -50,6 +50,12 @@ describe('OpenCodeAdapter.buildArgv', () => {
     const argv = adapter.buildArgv('x', { name: 'a', platform: 'opencode', role: '' });
     expect(argv).not.toContain('-m');
   });
+
+  it('配置 cwd 时透传 --dir（修正 PWD 解析项目目录的问题）', () => {
+    const adapter = new OpenCodeAdapter();
+    const argv = adapter.buildArgv('x', { ...baseConfig, cwd: '/tmp/wt' });
+    expect(argv).toEqual(expect.arrayContaining(['--dir', '/tmp/wt']));
+  });
 });
 
 describe('OpenCodeAdapter 端到端（注入伪 spawn）', () => {

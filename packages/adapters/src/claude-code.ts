@@ -53,6 +53,8 @@ export class ClaudeCodeAdapter implements AgentAdapter {
    */
   buildEnv(config: AgentConfig): NodeJS.ProcessEnv {
     const env: NodeJS.ProcessEnv = { ...process.env };
+    // 同步 PWD：spawn 的 cwd 不会更新 PWD，部分工具按 PWD 解析工作目录
+    if (config.cwd) env.PWD = config.cwd;
     const p = config.provider;
     if (p?.baseUrl) env.ANTHROPIC_BASE_URL = p.baseUrl;
     if (p?.authToken) {

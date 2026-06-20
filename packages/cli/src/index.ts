@@ -26,6 +26,8 @@ orchestrate 选项：
   --review       worker 汇报后让 leader 评审并产出 decision
   --max-rounds   worker↔leader 问答最大轮数（封顶 token，缺省 3）
   --cwd          覆盖 agent 工作目录（纯对话用空目录可省 token）
+  --repo <dir>   coding 模式：worker 在该 git 仓库的 worktree 内写码，leader 评审
+  --merge        coding 模式下评审通过则自动合并 worker 分支
 `;
 
 async function main(argv: string[]): Promise<number> {
@@ -73,6 +75,8 @@ async function main(argv: string[]): Promise<number> {
         review: { type: 'boolean', default: false },
         'max-rounds': { type: 'string' },
         cwd: { type: 'string' },
+        repo: { type: 'string' },
+        merge: { type: 'boolean', default: false },
         help: { type: 'boolean', short: 'h', default: false },
       },
     });
@@ -93,6 +97,8 @@ async function main(argv: string[]): Promise<number> {
       review: values.review,
       maxRounds: values['max-rounds'] ? Number(values['max-rounds']) : undefined,
       cwd: values.cwd,
+      repo: values.repo,
+      merge: values.merge,
     });
   }
 

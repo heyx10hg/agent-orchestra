@@ -1,6 +1,9 @@
+import { join } from 'node:path';
 import {
   Orchestrator,
   JsonlMessageBus,
+  WorkspaceManager,
+  Blackboard,
   type AgentConfig,
   type AgentOutput,
   type MessageEnvelope,
@@ -31,6 +34,10 @@ export interface OrchestrateOptions {
   maxRounds?: number;
   /** 覆盖 agent 工作目录（纯对话场景指向空目录省 token） */
   cwd?: string;
+  /** 目标 git 仓库目录；提供则进入 coding 模式（worker 在 worktree 写码、leader 评审） */
+  repo?: string;
+  /** coding 模式下评审通过是否自动合并 */
+  merge?: boolean;
   log?: (line: string) => void;
 }
 
@@ -43,13 +50,16 @@ export async function orchestrateTask(options: OrchestrateOptions): Promise<numb
   const worker = options.workerName ? selectAgent(config, options.workerName) : pickWorker(config, leader);
   if (!worker) throw new Error('orchestrate 需要至少两个 agent（一个 leader、一个 worker）');
 
-  const busPath = options.busPath ?? './.agent-orchestra/messages.jsonl';
+  const codingMode = !!options.repo;
+  const busPath = options.busPath ?? join(options.repo ?? '.', '.agent-orchestra', 'messages.jsonl');
   const bus = new JsonlMessageBus(busPath);
   const orch = new Orchestrator({
     bus,
     resolveAdapter: (c) => adapterFor(c.platform),
     review: options.review,
     cwd: options.cwd,
+    workspace: options.repo ? new WorkspaceManager(options.repo) : undefined,
+    blackboard: options.repo ? new Blackboard(join(options.repo, '.agent-orchestra')) : undefined,
     onOutput: (agent: AgentConfig, out: AgentOutput) => {
       if (out.kind === 'assistant' && out.text) log(`[${agent.name}] ${out.text}`);
       else if (out.kind === 'result' && out.usage?.total != null) log(`[${agent.name}] (本轮 ${out.usage.total} tokens)`);
@@ -57,8 +67,23 @@ export async function orchestrateTask(options: OrchestrateOptions): Promise<numb
     },
   });
 
+  log(`模式：${codingMode ? `coding（repo=${options.repo}）` : '对话'}`);
   log(`leader = ${leader.name} (${leader.platform})   worker = ${worker.name} (${worker.platform})`);
   log(`任务：${config.task.description}\n`);
+
+  if (codingMode) {
+    const r = await orch.runCodingTask({
+      leader,
+      worker,
+      task: config.task.description,
+      autoMerge: options.merge,
+    });
+    log(`\n=== 消息流（共 ${r.messages.length} 条，已持久化到 ${busPath}）===`);
+    for (const m of r.messages) log(formatMessage(m));
+    log(`\nworktree=${r.worktree.path} (${r.worktree.branch})  改动=${r.hasChanges}  评审通过=${r.approved}  已合并=${r.merged}`);
+    log(`=== token 累计：input=${r.usage.input ?? '-'} output=${r.usage.output ?? '-'} total=${r.usage.total ?? '-'} ===`);
+    return r.hasChanges ? 0 : 1;
+  }
 
   const { messages, usage, rounds } = await orch.runLeaderWorker({
     leader,
