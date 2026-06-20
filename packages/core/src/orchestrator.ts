@@ -182,8 +182,10 @@ export class Orchestrator {
 
     const worktree = workspace.createWorktree(worker.name);
 
-    const leaderAdapter = resolveAdapter(leader);
-    const leaderSession = await leaderAdapter.start(leader);
+    // leader 在目标仓库根目录工作（审查/合并），避免继承编排器自身的目录
+    const leaderCfg: AgentConfig = { ...leader, cwd: leader.cwd ?? workspace.repoDir };
+    const leaderAdapter = resolveAdapter(leaderCfg);
+    const leaderSession = await leaderAdapter.start(leaderCfg);
     // worker 在 worktree 内工作，并放开编辑权限
     const workerCfg: AgentConfig = {
       ...worker,
@@ -221,14 +223,16 @@ export class Orchestrator {
         createMessage({ from: worker.name, to: leader.name, role: worker.role, type: 'report', payload: { report: work.answer } }),
       );
 
-      const hasChanges = workspace.hasChanges(worktree.path);
-      const changes = hasChanges ? workspace.diff(worktree.path) : '(worker 未产生任何文件改动)';
+      // 把 worker 的未提交改动落盘提交；worker 也可能已自行 commit（两种都算改动）
+      workspace.commitIfDirty(worktree.path, `feat(${worker.name}): ${task}`);
+      const hasChanges = workspace.hasChanges(worktree.path, worktree.base);
+      const changes = hasChanges ? workspace.diff(worktree.path, worktree.base) : '(worker 未产生任何文件改动)';
 
       // 3) leader 审查 diff
       const reviewRun = await collectRun(
         leaderAdapter,
         leaderSession,
-        `worker 在隔离工作区完成了改动，diff/status 如下：\n\n${changes}\n\n请审查：达标则回复「通过」并简述，否则回复「不通过」并指出问题。`,
+        `worker 在隔离工作区完成了改动，相对基线的 diff 如下：\n\n${changes}\n\n请审查：达标则回复「通过」并简述，否则回复「不通过」并指出问题。`,
         (o) => onOutput?.(leader, o),
       );
       addUsage(usage, reviewRun.usage);
@@ -244,10 +248,9 @@ export class Orchestrator {
       );
       blackboard?.addDecision(leader.name, `${approved ? '通过' : '不通过'}：${reviewRun.answer}`);
 
-      // 4) 通过且要求自动合并则提交并合并
+      // 4) 通过且要求自动合并则合并（改动此时已是分支上的提交）
       let merged = false;
       if (hasChanges && approved && autoMerge) {
-        workspace.commitAll(worktree.path, `feat(${worker.name}): ${task}`);
         workspace.merge(worktree.branch);
         merged = true;
       }

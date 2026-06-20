@@ -102,7 +102,11 @@
 - [x] 真实跑验证（MiMo-only，cost 0）：worker 写真实代码、leader 审查、自动合并回主分支
 - [ ] CONTRACTS.md 并发控制、多 worker 并行（后续）
 
-**踩坑修复**：spawn 的 cwd 不更新 PWD，opencode 按 PWD 解析项目目录，导致 worker 跑在错误目录"假装"写文件——已通过 `--dir` + 同步 PWD 修正（真实跑才暴露）。
+**真实跑验证（跨平台）**：official Claude leader + MiMo OpenCode worker 完整跑通——worker 在 worktree 写真实代码并自提交，leader 审查 diff（246 token 精准评审）通过后合并回主分支，greet.js 成功落地。
+
+**踩坑修复（真实跑才暴露的两个 bug）**：
+1. spawn 的 cwd 不更新 PWD，opencode 按 PWD 解析项目目录 → worker 跑在错误目录"假装"写文件。修：`--dir` + 同步 PWD。
+2. worker 可能自行 `git commit`，`git status` 干净导致漏判改动。修：`hasChanges` 兼顾"未提交"与"分支领先基线的提交"，diff 用 `base...HEAD`。
 
 **验收标准**：
 - [x] worker 可以在独立 worktree 分支工作，leader 审查后合并

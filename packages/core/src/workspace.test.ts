@@ -36,12 +36,25 @@ describe('WorkspaceManager', () => {
     wm.remove(path);
   });
 
-  it('hasChanges 反映 worktree 内的改动', () => {
+  it('hasChanges 反映 worktree 内的未提交改动', () => {
     const wm = new WorkspaceManager(repo);
-    const { path } = wm.createWorktree('w');
-    expect(wm.hasChanges(path)).toBe(false);
+    const { path, base } = wm.createWorktree('w');
+    expect(wm.hasChanges(path, base)).toBe(false);
     writeFileSync(join(path, 'feature.txt'), 'hello\n');
-    expect(wm.hasChanges(path)).toBe(true);
+    expect(wm.hasChanges(path, base)).toBe(true);
+    wm.remove(path);
+  });
+
+  it('hasChanges 也识别 worker 自行提交的改动（status 已干净）', () => {
+    const wm = new WorkspaceManager(repo);
+    const { path, base } = wm.createWorktree('w');
+    // 模拟 worker 自己 add+commit
+    writeFileSync(join(path, 'feature.txt'), 'hello\n');
+    wm.commitAll(path, 'worker 自行提交');
+    expect(wm.hasUncommitted(path)).toBe(false); // 工作区已干净
+    expect(wm.hasChanges(path, base)).toBe(true); // 但分支领先基线
+    const d = wm.diff(path, base);
+    expect(d).toContain('feature.txt');
     wm.remove(path);
   });
 
@@ -52,18 +65,16 @@ describe('WorkspaceManager', () => {
     wm.commitAll(path, 'feat: 新增 feature.txt');
     wm.merge(branch);
 
-    // 主仓库工作区现在应能看到该文件
     expect(existsSync(join(repo, 'feature.txt'))).toBe(true);
     expect(readFileSync(join(repo, 'feature.txt'), 'utf8')).toBe('hello\n');
     wm.remove(path);
   });
 
-  it('diff 返回 worktree 内未提交改动的摘要', () => {
+  it('diff 返回未提交改动的摘要', () => {
     const wm = new WorkspaceManager(repo);
-    const { path } = wm.createWorktree('w');
+    const { path, base } = wm.createWorktree('w');
     writeFileSync(join(path, 'a.txt'), 'x\n');
-    const d = wm.diff(path);
-    expect(d).toContain('a.txt');
+    expect(wm.diff(path, base)).toContain('a.txt');
     wm.remove(path);
   });
 });
